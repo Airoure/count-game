@@ -7,8 +7,13 @@ import type {
   Question,
 } from '@/types'
 
-/** 服务器地址 */
-const SERVER_URL = 'http://localhost:3001'
+/**
+ * 服务器地址
+ *
+ * 开发环境：直连本地后端 localhost:3001
+ * 生产环境：同源（空字符串），由 Nginx 反向代理 /socket.io/ 到后端
+ */
+const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3001' : ''
 
 /** Socket 单例 */
 let socket: Socket | null = null
