@@ -262,11 +262,38 @@
   letter-spacing: 0.05em;
 }
 
+/* ===== 操作按钮区 ===== */
+.actionRow {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 1.5rem;
+}
+
+.historyBtn {
+  flex-shrink: 0;
+  padding: 1.1rem 1.5rem;
+  background: var(--paper);
+  color: var(--ink-soft);
+  border: 1.5px solid var(--mist);
+  border-radius: 6px;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.15em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.historyBtn:hover {
+  border-color: var(--vermilion);
+  color: var(--vermilion);
+}
+
 /* ===== 开始按钮 ===== */
 .startBtn {
+  flex: 1;
   display: block;
-  width: 100%;
-  margin-top: 1.5rem;
   padding: 1.1rem;
   background: var(--ink);
   color: var(--paper-light);

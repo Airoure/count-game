@@ -8,7 +8,7 @@ export type Difficulty = 'easy' | 'hard'
 export type GameMode = 'fixed' | 'endless' | 'battle'
 
 /** 应用阶段 */
-export type Phase = 'setup' | 'practice' | 'result' | 'battle-lobby' | 'battle-practice' | 'battle-result'
+export type Phase = 'setup' | 'practice' | 'result' | 'battle-lobby' | 'battle-practice' | 'battle-result' | 'history'
 
 /** 单道题目 */
 export interface Question {
@@ -91,6 +91,8 @@ export interface BattlePlayer {
   id: string
   name: string
   isHost: boolean
+  /** 是否在线（断线时为 false，重连后恢复 true） */
+  connected: boolean
 }
 
 /** 对战房间状态 */
@@ -124,3 +126,35 @@ export interface BattleResultEntry {
 
 /** 答错罚时（秒） */
 export const BATTLE_WRONG_PENALTY = 10
+
+/** Socket 连接状态 */
+export type ConnectionState = 'connected' | 'reconnecting'
+
+/**
+ * 重连归位快照（battle:rejoin 的 ack 返回）
+ *
+ * 包含房间完整状态，使前端可恢复到断线前的阶段与进度
+ */
+export interface BattleRejoinResult {
+  ok: boolean
+  error?: string
+  roomId: string
+  playerId: string
+  isHost: boolean
+  players: BattlePlayer[]
+  config: BattleConfig
+  /** 房间状态：waiting / playing / finished */
+  status: 'waiting' | 'playing' | 'finished'
+  /** 游戏中/已结束时携带题目 */
+  questions?: Question[]
+  startTime?: number | null
+  /** 自己的进度 */
+  currentIndex?: number
+  correctCount?: number
+  wrongCount?: number
+  finished?: boolean
+  /** 对手进度 */
+  opponents?: OpponentProgress[]
+  /** 已结束时携带结果 */
+  results?: BattleResultEntry[] | null
+}

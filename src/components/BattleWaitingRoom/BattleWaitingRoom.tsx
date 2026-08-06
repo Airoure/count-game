@@ -26,7 +26,8 @@ export function BattleWaitingRoom({
   onStart,
   onLeave,
 }: BattleWaitingRoomProps) {
-  const canStart = players.length >= 2
+  const connectedCount = players.filter((p) => p.connected).length
+  const canStart = connectedCount >= 2
 
   const opSymbols = config.operations.map((op) => OPERATION_META[op].symbol).join(' ')
 
@@ -49,9 +50,13 @@ export function BattleWaitingRoom({
       <div className={styles.sectionLabel}>参赛选手（{players.length}/2）</div>
       <div className={styles.playerList}>
         {players.map((player, idx) => (
-          <div key={player.id} className={styles.playerItem}>
+          <div
+            key={player.id}
+            className={`${styles.playerItem} ${!player.connected ? styles.playerOffline : ''}`}
+          >
             <span className={styles.playerBadge}>{idx === 0 ? '主' : '客'}</span>
             <span className={styles.playerName}>{player.name}</span>
+            {!player.connected && <span className={styles.offlineTag}>重连中</span>}
             {player.isHost && <span className={styles.hostTag}>房主</span>}
           </div>
         ))}
@@ -92,11 +97,11 @@ export function BattleWaitingRoom({
           type="button"
           disabled={!canStart}
         >
-          {canStart ? '开 始 对 战' : '等待对手加入…'}
+          {canStart ? '开 始 对 战' : '等待对手上线…'}
         </button>
       ) : (
         <div className={styles.waitingHint}>
-          {canStart ? '等待房主开始游戏…' : '等待其他玩家加入…'}
+          {canStart ? '等待房主开始游戏…' : '等待其他玩家上线…'}
         </div>
       )}
     </Card>

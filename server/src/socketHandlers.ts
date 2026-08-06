@@ -5,95 +5,135 @@ import type { BattleConfig } from './types.js'
 /**
  * Socket 事件处理器
  *
- * 处理客户端的创建房间、加入房间、开始游戏、提交答案、离开房间等事件
+ * 处理客户端的创建房间、加入房间、重连归位、开始游戏、提交答案、离开房间等事件
+ *
+ * 身份模型：客户端携带持久化 playerId，服务器以 playerId 管理玩家；
+ * socket.id 仅通过 manager.resolvePlayer() 在事件处理时解析为 playerId。
  */
 export function registerSocketHandlers(io: Server): void {
-  const manager = new RoomManager()
+  const manager = new RoomManager(io)
+  // 启动僵尸房间兜底清理
+  manager.startCleanup()
 
   io.on('connection', (socket: Socket) => {
     console.log(`[连接] ${socket.id}`)
 
     // ===== 创建房间 =====
-    socket.on('battle:create', (payload: { name: string; config: BattleConfig }, ack?: (res: unknown) => void) => {
-      const { name, config } = payload
-      if (!name || !config || !config.operations?.length || !config.totalCount) {
-        ack?.({ error: '参数不合法' })
-        return
-      }
+    socket.on(
+      'battle:create',
+      (payload: { playerId: string; name: string; config: BattleConfig }, ack?: (res: unknown) => void) => {
+        const { playerId, name, config } = payload
+        if (!playerId || !name || !config || !config.operations?.length || !config.totalCount) {
+          ack?.({ error: '参数不合法' })
+          return
+        }
 
-      const room = manager.createRoom(socket.id, name, config)
-      socket.join(room.id)
+        const room = manager.createRoom(playerId, name, config, socket.id)
+        socket.join(room.id)
 
-      const result = {
-        roomId: room.id,
-        playerId: socket.id,
-        players: room.getPlayers().map((p) => ({ id: p.id, name: p.name, isHost: p.isHost })),
-        config: room.config,
-        isHost: true,
-      }
+        const result = {
+          roomId: room.id,
+          playerId,
+          players: room.getPlayersView(),
+          config: room.config,
+          isHost: true,
+        }
 
-      ack?.(result)
-      console.log(`[创建房间] ${room.id} by ${name}`)
-    })
+        ack?.(result)
+        console.log(`[创建房间] ${room.id} by ${name}`)
+      },
+    )
 
     // ===== 加入房间 =====
-    socket.on('battle:join', (payload: { roomId: string; name: string }, ack?: (res: unknown) => void) => {
-      const { roomId, name } = payload
-      if (!roomId || !name) {
-        ack?.({ error: '参数不合法' })
-        return
-      }
+    socket.on(
+      'battle:join',
+      (payload: { playerId: string; roomId: string; name: string }, ack?: (res: unknown) => void) => {
+        const { playerId, roomId, name } = payload
+        if (!playerId || !roomId || !name) {
+          ack?.({ error: '参数不合法' })
+          return
+        }
 
-      const room = manager.getRoom(roomId.toUpperCase())
-      if (!room) {
-        ack?.({ error: '房间不存在' })
-        return
-      }
-      if (!room.isWaiting) {
-        ack?.({ error: '游戏已开始，无法加入' })
-        return
-      }
+        const normalizedId = roomId.toUpperCase()
+        const room = manager.getRoom(normalizedId)
+        if (!room) {
+          ack?.({ error: '房间不存在' })
+          return
+        }
+        if (!room.isWaiting) {
+          ack?.({ error: '游戏已开始，无法加入' })
+          return
+        }
 
-      const joined = manager.joinRoom(roomId.toUpperCase(), socket.id, name)
-      if (!joined) {
-        ack?.({ error: '加入失败' })
-        return
-      }
+        const joined = manager.joinRoom(normalizedId, playerId, name, socket.id)
+        if (!joined) {
+          ack?.({ error: '加入失败' })
+          return
+        }
 
-      socket.join(room.id)
+        socket.join(room.id)
 
-      const result = {
-        roomId: room.id,
-        playerId: socket.id,
-        players: room.getPlayers().map((p) => ({ id: p.id, name: p.name, isHost: p.isHost })),
-        config: room.config,
-        isHost: false,
-      }
+        const result = {
+          roomId: room.id,
+          playerId,
+          players: room.getPlayersView(),
+          config: room.config,
+          isHost: false,
+        }
 
-      ack?.(result)
+        ack?.(result)
 
-      // 通知房间内其他玩家
-      socket.to(room.id).emit('battle:player_joined', {
-        playerId: socket.id,
-        name,
-      })
+        // 广播成员变化给房间内所有人
+        manager.emitPlayersUpdate(room)
 
-      console.log(`[加入房间] ${name} → ${room.id}`)
-    })
+        console.log(`[加入房间] ${name} → ${room.id}`)
+      },
+    )
+
+    // ===== 重连归位 =====
+    socket.on(
+      'battle:rejoin',
+      (payload: { playerId: string; roomId: string }, ack?: (res: unknown) => void) => {
+        const { playerId, roomId } = payload
+        if (!playerId || !roomId) {
+          ack?.({ ok: false, error: '参数不合法' })
+          return
+        }
+
+        const room = manager.rejoin(playerId, roomId.toUpperCase(), socket.id)
+        if (!room) {
+          ack?.({ ok: false, error: '房间已失效或你不在该房间' })
+          return
+        }
+
+        // 重新加入 socket.io 房间，恢复广播接收
+        socket.join(room.id)
+
+        // 广播成员在线状态变化
+        manager.emitPlayersUpdate(room)
+
+        // 返回完整快照，供前端恢复阶段与进度
+        ack?.(manager.buildRejoinSnapshot(room, playerId))
+
+        console.log(`[重连归位] ${playerId} → ${room.id}`)
+      },
+    )
 
     // ===== 开始游戏 =====
     socket.on('battle:start', (payload: { roomId: string }, ack?: (res: unknown) => void) => {
-      const room = manager.getRoom(payload.roomId)
-      if (!room) {
-        ack?.({ error: '房间不存在' })
+      const resolved = manager.resolvePlayer(socket.id)
+      if (!resolved) {
+        ack?.({ error: '你不在房间中' })
         return
       }
-      if (socket.id !== room.hostId) {
+      const { room, player } = resolved
+
+      if (player.id !== room.hostId) {
         ack?.({ error: '只有房主可以开始游戏' })
         return
       }
-      if (room.playerCount < 2) {
-        ack?.({ error: '至少需要 2 名玩家' })
+      if (room.connectedPlayerCount < 2) {
+        ack?.({ error: '等待对手上线' })
         return
       }
 
@@ -117,13 +157,19 @@ export function registerSocketHandlers(io: Server): void {
 
     // ===== 提交答案 =====
     socket.on('battle:answer', (payload: { roomId: string; answer: number }, ack?: (res: unknown) => void) => {
-      const room = manager.getRoom(payload.roomId)
-      if (!room || !room.isPlaying) {
+      const resolved = manager.resolvePlayer(socket.id)
+      if (!resolved) {
+        ack?.({ error: '游戏未在进行中' })
+        return
+      }
+      const { room, player } = resolved
+
+      if (!room.isPlaying) {
         ack?.({ error: '游戏未在进行中' })
         return
       }
 
-      const result = room.submitAnswer(socket.id, payload.answer)
+      const result = room.submitAnswer(player.id, payload.answer)
       if (!result) {
         ack?.({ error: '无法提交答案' })
         return
@@ -137,7 +183,7 @@ export function registerSocketHandlers(io: Server): void {
       })
 
       // 广播进度给房间内其他玩家
-      const progress = room.getPlayerProgress(socket.id)
+      const progress = room.getPlayerProgress(player.id)
       if (progress) {
         socket.to(room.id).emit('battle:progress', progress)
       }
@@ -150,29 +196,44 @@ export function registerSocketHandlers(io: Server): void {
       }
     })
 
-    // ===== 离开房间 =====
-    const handleLeave = () => {
-      const removed = manager.removePlayer(socket.id)
-      if (removed) {
-        const { room, player } = removed
-        socket.to(room.id).emit('battle:player_left', {
-          playerId: socket.id,
-          name: player.name,
-        })
-
-        // 如果游戏正在进行且剩余玩家不足，结束游戏
-        if (room.isPlaying && room.playerCount < 2) {
-          const results = room.getResults()
-          io.to(room.id).emit('battle:game_over', { results })
-          console.log(`[游戏中断] 房间 ${room.id}, 玩家离开`)
+    // ===== 再来一局 =====
+    socket.on(
+      'battle:rematch',
+      (payload: { playerId: string; roomId: string }, ack?: (res: unknown) => void) => {
+        const { playerId, roomId } = payload
+        if (!playerId || !roomId) {
+          ack?.({ ok: false, error: '参数不合法' })
+          return
         }
 
+        const room = manager.rematch(playerId, roomId.toUpperCase())
+        if (!room) {
+          ack?.({ ok: false, error: '无法再来一局' })
+          return
+        }
+
+        ack?.({ ok: true })
+        console.log(`[再来一局] ${playerId} → ${room.id}`)
+      },
+    )
+
+    // ===== 离开房间 =====
+    socket.on('battle:leave', () => {
+      const resolved = manager.resolvePlayer(socket.id)
+      if (resolved) {
+        const { room, player } = resolved
+        manager.removePlayer(player.id)
         console.log(`[离开房间] ${player.name} ← ${room.id}`)
       }
-    }
+    })
 
-    socket.on('battle:leave', handleLeave)
-    socket.on('disconnect', handleLeave)
+    // ===== 断线（进入宽限期，不立即移除） =====
+    socket.on('disconnect', () => {
+      const info = manager.handleDisconnect(socket.id)
+      if (info) {
+        console.log(`[断线] ${info.player.name} ← ${info.room.id}（进入宽限期）`)
+      }
+    })
 
     console.log(`[连接建立] ${socket.id}`)
   })

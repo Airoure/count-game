@@ -134,6 +134,23 @@
   letter-spacing: 0.1em;
 }
 
+/* 离线玩家（断线重连中） */
+.playerOffline {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.offlineTag {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  letter-spacing: 0.1em;
+  animation: pulse 2s ease-in-out infinite;
+}
+
 .playerItemPlaceholder {
   display: flex;
   align-items: center;

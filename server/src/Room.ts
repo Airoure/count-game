@@ -1,5 +1,6 @@
 import type {
   BattleConfig,
+  BattlePlayer,
   PlayerState,
   PlayerProgress,
   Question,
@@ -13,28 +14,40 @@ import { generateQuestions } from './QuestionGenerator.js'
  * 房间类
  *
  * 管理一个对战房间的完整生命周期：
- * 玩家加入/离开、游戏开始、答题判定、进度同步、结果汇总
+ * 玩家加入/离开/断线重连、游戏开始、答题判定、进度同步、结果汇总
+ *
+ * 身份模型：玩家以 playerId（持久化）为唯一标识，socketId 仅作传输通道。
+ * 断线时玩家被标记为 connected=false 但保留在房间内，等待宽限期内重连。
  */
 export class Room {
   readonly id: string
-  readonly hostId: string
   readonly config: BattleConfig
+  /** 房间创建时间戳，用于 TTL 清理 */
+  readonly createdAt: number
 
+  /** 当前房主的 playerId（房主转移时会变更） */
+  private _hostId: string
   private players = new Map<string, PlayerState>()
   private status: RoomStatus = 'waiting'
   private questions: Question[] = []
   private startTime: number | null = null
   private finishedCount = 0
 
-  constructor(id: string, hostId: string, hostName: string, config: BattleConfig) {
+  constructor(id: string, hostId: string, hostName: string, config: BattleConfig, hostSocketId: string) {
     this.id = id
-    this.hostId = hostId
     this.config = config
-    this.addPlayer(hostId, hostName, true)
+    this.createdAt = Date.now()
+    this._hostId = hostId
+    this.addPlayer(hostId, hostName, true, hostSocketId)
+  }
+
+  /** 房主 playerId */
+  get hostId(): string {
+    return this._hostId
   }
 
   /** 添加玩家 */
-  addPlayer(playerId: string, name: string, isHost = false): boolean {
+  addPlayer(playerId: string, name: string, isHost: boolean, socketId: string): boolean {
     if (this.players.has(playerId)) return false
     if (this.status !== 'waiting') return false
 
@@ -47,11 +60,14 @@ export class Room {
       wrongCount: 0,
       finished: false,
       finishTime: null,
+      socketId,
+      connected: true,
+      disconnectedAt: null,
     })
     return true
   }
 
-  /** 移除玩家 */
+  /** 移除玩家（真实移除，非断线标记） */
   removePlayer(playerId: string): PlayerState | null {
     const player = this.players.get(playerId)
     if (!player) return null
@@ -59,14 +75,78 @@ export class Room {
     return player
   }
 
+  /** 玩家是否存在（含断线未移除的） */
+  hasPlayer(playerId: string): boolean {
+    return this.players.has(playerId)
+  }
+
+  /** 重新绑定 socket（重连时调用） */
+  rebindSocket(playerId: string, socketId: string): boolean {
+    const player = this.players.get(playerId)
+    if (!player) return false
+    player.socketId = socketId
+    player.connected = true
+    player.disconnectedAt = null
+    return true
+  }
+
+  /** 标记玩家断线（不移除，等待宽限期） */
+  markDisconnected(playerId: string): boolean {
+    const player = this.players.get(playerId)
+    if (!player) return false
+    player.socketId = null
+    player.connected = false
+    player.disconnectedAt = Date.now()
+    return true
+  }
+
+  /** 根据 socket.id 查找玩家 */
+  getPlayerBySocketId(socketId: string): PlayerState | null {
+    for (const player of this.players.values()) {
+      if (player.socketId === socketId) return player
+    }
+    return null
+  }
+
+  /** 转移房主给指定玩家 */
+  transferHost(toPlayerId: string): boolean {
+    const player = this.players.get(toPlayerId)
+    if (!player) return false
+    // 清除旧房主标记
+    const oldHost = this.players.get(this._hostId)
+    if (oldHost) oldHost.isHost = false
+    player.isHost = true
+    this._hostId = toPlayerId
+    return true
+  }
+
   /** 获取所有玩家 */
   getPlayers(): PlayerState[] {
     return Array.from(this.players.values())
   }
 
-  /** 获取玩家数量 */
+  /** 获取下发前端的玩家视图（含在线状态） */
+  getPlayersView(): BattlePlayer[] {
+    return this.getPlayers().map((p) => ({
+      id: p.id,
+      name: p.name,
+      isHost: p.isHost,
+      connected: p.connected,
+    }))
+  }
+
+  /** 玩家总数（含断线未移除） */
   get playerCount(): number {
     return this.players.size
+  }
+
+  /** 在线玩家数 */
+  get connectedPlayerCount(): number {
+    let count = 0
+    for (const p of this.players.values()) {
+      if (p.connected) count++
+    }
+    return count
   }
 
   /** 是否在等待中 */
@@ -77,6 +157,21 @@ export class Room {
   /** 是否在游戏中 */
   get isPlaying(): boolean {
     return this.status === 'playing'
+  }
+
+  /** 是否已结束 */
+  get isFinished(): boolean {
+    return this.status === 'finished'
+  }
+
+  /** 房间状态 */
+  get roomStatus(): RoomStatus {
+    return this.status
+  }
+
+  /** 题目列表（重连时下发） */
+  getQuestions(): Question[] {
+    return this.questions
   }
 
   /** 开始游戏 */
@@ -99,6 +194,31 @@ export class Room {
     }
 
     return this.questions
+  }
+
+  /** 强制结束游戏（玩家离场导致人数不足时） */
+  endGame(): void {
+    this.status = 'finished'
+  }
+
+  /**
+   * 重置房间到等待状态（再来一局）
+   *
+   * 清除题目、计时、所有玩家的答题进度，
+   * 房间回到 waiting 状态，房主可重新开始游戏。
+   */
+  resetToWaiting(): void {
+    this.status = 'waiting'
+    this.questions = []
+    this.startTime = null
+    this.finishedCount = 0
+    for (const player of this.players.values()) {
+      player.currentIndex = 0
+      player.correctCount = 0
+      player.wrongCount = 0
+      player.finished = false
+      player.finishTime = null
+    }
   }
 
   /**

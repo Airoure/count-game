@@ -94,3 +94,47 @@
     right: -5px;
   }
 }
+
+/* ===== 用户信息栏 ===== */
+.userBar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.username {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--ink);
+  letter-spacing: 0.1em;
+}
+
+.logoutBtn {
+  background: none;
+  border: 1px solid var(--mist);
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  font-family: var(--font-serif);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: 0.1em;
+}
+
+.logoutBtn:hover {
+  border-color: var(--vermilion);
+  color: var(--vermilion);
+}
+
+@media (max-width: 640px) {
+  .userBar {
+    position: static;
+    justify-content: center;
+    margin-top: 0.8rem;
+  }
+}

@@ -14,6 +14,8 @@ interface BattleLobbyProps {
   onBack: () => void
   error: string | null
   onClearError: () => void
+  /** 默认昵称（登录用户名） */
+  defaultName?: string
 }
 
 /**
@@ -22,17 +24,17 @@ interface BattleLobbyProps {
  * 两种入口：创建房间 / 加入房间
  * 创建房间时可配置运算类型、难度、题量
  */
-export function BattleLobby({ onCreateRoom, onJoinRoom, onBack, error, onClearError }: BattleLobbyProps) {
+export function BattleLobby({ onCreateRoom, onJoinRoom, onBack, error, onClearError, defaultName }: BattleLobbyProps) {
   const [tab, setTab] = useState<'create' | 'join'>('create')
 
   // 创建房间的表单状态
-  const [name, setName] = useState('')
+  const [name, setName] = useState(defaultName ?? '')
   const [operations, setOperations] = useState<Operation[]>(['add', 'sub', 'mul', 'div'])
   const [difficulty, setDifficulty] = useState<Difficulty>('easy')
   const [totalCount, setTotalCount] = useState(20)
 
   // 加入房间的表单状态
-  const [joinName, setJoinName] = useState('')
+  const [joinName, setJoinName] = useState(defaultName ?? '')
   const [roomCode, setRoomCode] = useState('')
 
   const toggleOperation = (op: Operation) => {

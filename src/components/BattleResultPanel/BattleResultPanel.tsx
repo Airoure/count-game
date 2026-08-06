@@ -7,6 +7,7 @@ interface BattleResultPanelProps {
   results: BattleResultEntry[]
   playerId: string
   onLeave: () => void
+  onRematch: () => void
 }
 
 /**
@@ -14,7 +15,7 @@ interface BattleResultPanelProps {
  *
  * 展示排名、胜负判定、双方详细数据对比
  */
-export function BattleResultPanel({ results, playerId, onLeave }: BattleResultPanelProps) {
+export function BattleResultPanel({ results, playerId, onLeave, onRematch }: BattleResultPanelProps) {
   const myResult = results.find((r) => r.playerId === playerId)
   const isWinner = myResult?.rank === 1
 
@@ -84,9 +85,14 @@ export function BattleResultPanel({ results, playerId, onLeave }: BattleResultPa
         </div>
       )}
 
-      <button className={styles.leaveBtn} onClick={onLeave} type="button">
-        返回大厅
-      </button>
+      <div className={styles.actions}>
+        <button className={styles.rematchBtn} onClick={onRematch} type="button">
+          再来一局
+        </button>
+        <button className={styles.leaveBtn} onClick={onLeave} type="button">
+          返回大厅
+        </button>
+      </div>
     </Card>
   )
 }
