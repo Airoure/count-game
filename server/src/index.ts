@@ -4,6 +4,7 @@ import { Server } from 'socket.io'
 import { registerSocketHandlers } from './socketHandlers.js'
 import { registerAuthRoutes } from './auth.js'
 import { registerRecordRoutes } from './recordRoutes.js'
+import { registerWorksheetRoutes } from './worksheetRoutes.js'
 
 const PORT = 3001
 
@@ -18,7 +19,7 @@ app.use((req, res, next) => {
   const origin = req.headers.origin
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin)
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   }
   // 预检请求直接返回
@@ -30,13 +31,16 @@ app.use((req, res, next) => {
 })
 
 // 解析 JSON 请求体
-app.use(express.json())
+app.use(express.json({ limit: '50mb' }))
 
 // 认证路由（注册 / 登录 / 获取当前用户）
 registerAuthRoutes(app)
 
 // 做题记录路由（保存 / 查询 / 统计）
 registerRecordRoutes(app)
+
+// 高照数算路由（题库解析 / 管理 / 打卡）
+registerWorksheetRoutes(app)
 
 // 健康检查接口
 app.get('/health', (_req, res) => {

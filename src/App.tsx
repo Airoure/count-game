@@ -10,6 +10,7 @@ import { BattlePracticePanel } from '@/components/BattlePracticePanel/BattlePrac
 import { BattleResultPanel } from '@/components/BattleResultPanel/BattleResultPanel'
 import { LoginPanel } from '@/components/LoginPanel/LoginPanel'
 import { HistoryPanel } from '@/components/HistoryPanel/HistoryPanel'
+import { GaozhaoPanel } from '@/components/GaozhaoPanel/GaozhaoPanel'
 import { CornerOrnaments } from '@/components/shared/CornerOrnaments'
 import { usePractice } from '@/hooks/usePractice'
 import { useBattle } from '@/hooks/useBattle'
@@ -44,6 +45,7 @@ export default function App() {
   const [config, setConfig] = useState<PracticeConfig>(DEFAULT_CONFIG)
   const [battleEntry, setBattleEntry] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [showGaozhao, setShowGaozhao] = useState(false)
   const practice = usePractice()
   const battle = useBattle()
   const { isMuted, toggleMute } = useBackgroundMusic(bgMusic)
@@ -60,6 +62,8 @@ export default function App() {
   let phase: Phase
   if (showHistory) {
     phase = 'history'
+  } else if (showGaozhao) {
+    phase = 'gaozhao'
   } else if (inBattle) {
     // 对战模式阶段
     switch (battle.phase) {
@@ -93,6 +97,7 @@ export default function App() {
     }
     setBattleEntry(false)
     setShowHistory(false)
+    setShowGaozhao(false)
     setConfig({ ...config, mode: 'fixed' })
   }
 
@@ -185,6 +190,7 @@ export default function App() {
             }
           }}
           onShowHistory={() => setShowHistory(true)}
+          onShowGaozhao={() => setShowGaozhao(true)}
         />
       )}
 
@@ -279,6 +285,11 @@ export default function App() {
       {/* ===== 历史记录 ===== */}
       {phase === 'history' && (
         <HistoryPanel onBack={() => setShowHistory(false)} />
+      )}
+
+      {/* ===== 高照数算 ===== */}
+      {phase === 'gaozhao' && (
+        <GaozhaoPanel onBack={() => setShowGaozhao(false)} />
       )}
     </div>
   )

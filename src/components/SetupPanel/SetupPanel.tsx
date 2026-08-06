@@ -15,6 +15,7 @@ interface SetupPanelProps {
   onConfigChange: (config: PracticeConfig) => void
   onStart: () => void
   onShowHistory: () => void
+  onShowGaozhao: () => void
 }
 
 /**
@@ -23,7 +24,7 @@ interface SetupPanelProps {
  * 四段式配置：模式选择、运算类型（多选）、难度等级（单选）、
  * 题目数量（固定模式）或时间设置（无尽模式）
  */
-export function SetupPanel({ config, onConfigChange, onStart, onShowHistory }: SetupPanelProps) {
+export function SetupPanel({ config, onConfigChange, onStart, onShowHistory, onShowGaozhao }: SetupPanelProps) {
   const setMode = (mode: GameMode) => {
     onConfigChange({ ...config, mode })
   }
@@ -215,6 +216,9 @@ export function SetupPanel({ config, onConfigChange, onStart, onShowHistory }: S
       <div className={styles.actionRow}>
         <button className={styles.historyBtn} onClick={onShowHistory} type="button">
           修行履历
+        </button>
+        <button className={styles.historyBtn} onClick={onShowGaozhao} type="button">
+          高照数算
         </button>
         <button className={styles.startBtn} onClick={onStart} type="button">
           <span>{config.mode === 'battle' ? '进 入 对 战' : '开 始 修 炼'}</span>

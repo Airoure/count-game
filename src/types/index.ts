@@ -8,7 +8,7 @@ export type Difficulty = 'easy' | 'hard'
 export type GameMode = 'fixed' | 'endless' | 'battle'
 
 /** 应用阶段 */
-export type Phase = 'setup' | 'practice' | 'result' | 'battle-lobby' | 'battle-practice' | 'battle-result' | 'history'
+export type Phase = 'setup' | 'practice' | 'result' | 'battle-lobby' | 'battle-practice' | 'battle-result' | 'history' | 'gaozhao'
 
 /** 单道题目 */
 export interface Question {
