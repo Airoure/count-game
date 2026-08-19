@@ -83,8 +83,29 @@ export function BattlePracticePanel({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
       handleSubmit()
+    }
+  }
+
+  /**
+   * 输入变化处理：更新值，并实时检测是否输入了正确答案
+   *
+   * 背景：去掉提交按钮后，用户输入正确答案时需要自动触发提交和跳转。
+   * 设计意图：在 onChange 中实时比对输入值与正确答案，匹配时立即通过
+   * Socket 提交，服务端判定答对后客户端自动跳转。保留 Enter 提交错误答案
+   * 的能力，确保答错也能被记录并触发罚时。
+   * 约束：仅在未答题状态下检测；已答题后输入框 disabled 防止重复触发。
+   * 与练习模式的区别：对战模式答错不跳转，需重答。
+   */
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    setInputValue(val)
+    if (!isAnswered) {
+      const userAns = parseInt(val, 10)
+      if (!Number.isNaN(userAns) && userAns === question.answer) {
+        onSubmit(userAns)
+      }
     }
   }
 
@@ -191,20 +212,12 @@ export function BattlePracticePanel({
           type="number"
           className={inputClass}
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder="输入答案"
           autoComplete="off"
           disabled={isAnswered}
         />
-        <button
-          className={styles.submitBtn}
-          onClick={handleSubmit}
-          type="button"
-          disabled={isAnswered}
-        >
-          提交
-        </button>
       </div>
 
       {/* 反馈 */}
