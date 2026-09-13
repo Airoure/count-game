@@ -1,10 +1,13 @@
 // ===== 共享类型定义 =====
 
-/** 运算类型 */
-export type Operation = 'add' | 'sub' | 'mul' | 'div'
+/** 运算类型（square：平方数；mul19：大九九 11~19 互乘） */
+export type Operation = 'add' | 'sub' | 'mul' | 'div' | 'square' | 'mul19'
 
 /** 难度等级 */
 export type Difficulty = 'easy' | 'hard'
+
+/** 出题方向：forward 正向（11² = ?）；reverse 逆向（?² = 121）；mixed 混合 */
+export type QuestionDirection = 'forward' | 'reverse' | 'mixed'
 
 /** 房间状态 */
 export type RoomStatus = 'waiting' | 'playing' | 'finished'
@@ -16,12 +19,21 @@ export interface Question {
   op: Operation
   symbol: string
   answer: number
+  /**
+   * 逆向题标记（仅 square / mul19 会出现）
+   *
+   * 逆向时 a 为待求值（即答案），b 为题目中展示的已知数：
+   * square：?² = b，answer = a；mul19：? × b = a × b，answer = a
+   */
+  reversed?: boolean
 }
 
 /** 对战配置 */
 export interface BattleConfig {
   operations: Operation[]
   difficulty: Difficulty
+  /** 出题方向（仅平方数 / 大九九生效） */
+  direction: QuestionDirection
   totalCount: number
 }
 

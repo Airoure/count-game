@@ -1,6 +1,7 @@
 import { useHistory } from '@/hooks/useHistory'
 import { OPERATION_META } from '@/utils/questionGenerator'
-import type { Operation, GameMode } from '@/services/record'
+import type { GameMode } from '@/services/record'
+import type { Operation } from '@/types'
 import styles from './HistoryPanel.module.css'
 
 /** 模式标签映射 */

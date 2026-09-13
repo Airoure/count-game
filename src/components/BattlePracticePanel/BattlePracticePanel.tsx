@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Card } from '@/components/shared/Card'
+import { Keypad } from '@/components/shared/Keypad'
 import { useSound } from '@/hooks/useSound'
 import { formatTime } from '@/utils/format'
+import { isTouchDevice } from '@/utils/touch'
 import type { Question, AnswerStatus, OpponentProgress } from '@/types'
 import { BATTLE_WRONG_PENALTY } from '@/types'
 import styles from './BattlePracticePanel.module.css'
@@ -43,6 +45,7 @@ export function BattlePracticePanel({
 }: BattlePracticePanelProps) {
   const [inputValue, setInputValue] = useState('')
   const [elapsed, setElapsed] = useState(0)
+  const [isTouch] = useState(isTouchDevice)
   const inputRef = useRef<HTMLInputElement>(null)
   const playCorrect = useSound(correctSound)
   const playWrong = useSound(wrongSound)
@@ -89,17 +92,17 @@ export function BattlePracticePanel({
   }
 
   /**
-   * 输入变化处理：更新值，并实时检测是否输入了正确答案
+   * 应用输入值：更新状态，并实时检测是否输入了正确答案
    *
    * 背景：去掉提交按钮后，用户输入正确答案时需要自动触发提交和跳转。
-   * 设计意图：在 onChange 中实时比对输入值与正确答案，匹配时立即通过
-   * Socket 提交，服务端判定答对后客户端自动跳转。保留 Enter 提交错误答案
-   * 的能力，确保答错也能被记录并触发罚时。
-   * 约束：仅在未答题状态下检测；已答题后输入框 disabled 防止重复触发。
+   * 设计意图：实时比对输入值与正确答案，匹配时立即通过 Socket 提交，
+   * 服务端判定答对后客户端自动跳转。保留 Enter 提交错误答案的能力，
+   * 确保答错也能被记录并触发罚时。
+   * 约束：仅在未答题状态下检测；已答题后输入框禁用、键盘输入被忽略。
+   * 物理键盘 onChange 与移动端内置数字键盘共用此入口。
    * 与练习模式的区别：对战模式答错不跳转，需重答。
    */
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value
+  const applyValue = (val: string) => {
     setInputValue(val)
     if (!isAnswered) {
       const userAns = parseInt(val, 10)
@@ -107,6 +110,28 @@ export function BattlePracticePanel({
         onSubmit(userAns)
       }
     }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    applyValue(e.target.value)
+  }
+
+  // ===== 移动端内置数字键盘 =====
+  const handleDigit = (digit: string) => {
+    if (isAnswered) return
+    const next = inputValue + digit
+    if (next.length > 6) return
+    applyValue(next)
+  }
+
+  const handleBackspace = () => {
+    if (isAnswered) return
+    applyValue(inputValue.slice(0, -1))
+  }
+
+  const handleClear = () => {
+    if (isAnswered) return
+    applyValue('')
   }
 
   // 进度条
@@ -130,6 +155,35 @@ export function BattlePracticePanel({
   const inputClass = `${styles.answerInput} ${
     answerStatus === 'correct' ? styles.inputCorrect : ''
   } ${answerStatus === 'wrong' ? styles.inputWrong : ''}`
+
+  // 题目表达式与结果：正向给数求结果（12² = ?），逆向给结果求数（?² = 144）
+  const reversed = question.reversed === true
+  const questionExpr =
+    question.op === 'square' ? (
+      <span className={styles.num}>
+        {reversed ? '?' : question.a}
+        <sup className={styles.squareExp}>2</sup>
+      </span>
+    ) : reversed ? (
+      <>
+        <span className={styles.num}>?</span>
+        <span className={styles.op}>{question.symbol}</span>
+        <span className={styles.num}>{question.b}</span>
+      </>
+    ) : (
+      <>
+        <span className={styles.num}>{question.a}</span>
+        <span className={styles.op}>{question.symbol}</span>
+        <span className={styles.num}>{question.b}</span>
+      </>
+    )
+  const questionResult = reversed ? (
+    <span className={styles.num}>
+      {question.op === 'square' ? question.b : question.a * question.b}
+    </span>
+  ) : (
+    <span className={styles.num}>?</span>
+  )
 
   return (
     <Card className={styles.battlePanel}>
@@ -197,11 +251,9 @@ export function BattlePracticePanel({
       <div className={styles.questionArea}>
         <div className={styles.questionNumber}>第 {currentIndex + 1} 题</div>
         <div className={styles.questionDisplay}>
-          <span className={styles.num}>{question.a}</span>
-          <span className={styles.op}>{question.symbol}</span>
-          <span className={styles.num}>{question.b}</span>
+          {questionExpr}
           <span className={styles.equals}>=</span>
-          <span className={styles.num}>?</span>
+          {questionResult}
         </div>
       </div>
 
@@ -214,11 +266,25 @@ export function BattlePracticePanel({
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder="输入答案"
+          placeholder={isTouch ? '点下方键盘输入' : '输入答案'}
           autoComplete="off"
           disabled={isAnswered}
+          inputMode={isTouch ? 'none' : undefined}
+          readOnly={isTouch}
         />
       </div>
+
+      {/* 触屏设备：内置数字键盘代替系统键盘，
+          避免键盘反复弹出/收起后无法唤起，且不遮挡题目 */}
+      {isTouch && (
+        <Keypad
+          onDigit={handleDigit}
+          onBackspace={handleBackspace}
+          onClear={handleClear}
+          onConfirm={handleSubmit}
+          confirmDisabled={isAnswered}
+        />
+      )}
 
       {/* 反馈 */}
       <div className={feedbackClass}>{feedbackText}</div>

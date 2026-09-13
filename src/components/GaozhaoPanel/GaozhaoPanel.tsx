@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Card } from '@/components/shared/Card'
+import { Keypad } from '@/components/shared/Keypad'
 import { useGaozhao } from '@/hooks/useGaozhao'
 import { useTimer } from '@/hooks/useTimer'
 import { useSound } from '@/hooks/useSound'
 import { parseQuestionStrings } from '@/utils/worksheetParser'
 import { calculateGrade } from '@/utils/questionGenerator'
 import { formatTime, formatQuestionNumber } from '@/utils/format'
+import { isTouchDevice } from '@/utils/touch'
 import type { Question, AnswerStatus, PracticeResult } from '@/types'
 import type { Worksheet } from '@/services/worksheet'
 import styles from './GaozhaoPanel.module.css'
@@ -51,6 +53,7 @@ export function GaozhaoPanel({ onBack }: GaozhaoPanelProps) {
   const [answerStatus, setAnswerStatus] = useState<AnswerStatus>('idle')
   const [inputValue, setInputValue] = useState('')
   const [result, setResult] = useState<PracticeResult | null>(null)
+  const [isTouch] = useState(isTouchDevice)
 
   const timer = useTimer()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -191,21 +194,20 @@ export function GaozhaoPanel({ onBack }: GaozhaoPanelProps) {
   }
 
   /**
-   * 输入变化处理：更新值，并实时检测是否输入了正确答案
+   * 应用输入值：更新状态，并实时检测是否输入了正确答案
    *
    * 背景：去掉提交按钮后，用户输入正确答案时需要自动触发提交和跳转。
-   * 设计意图：在 onChange 中实时比对输入值与正确答案，匹配时立即提交
-   * 并设置延迟跳转，与原来点提交按钮的效果一致。保留 Enter 提交错误答案
-   * 的能力，确保答错也能被记录并显示正确答案。
-   * 约束：仅在未答题状态下检测，已答题后输入框 disabled 防止重复触发。
+   * 设计意图：实时比对输入值与正确答案，匹配时立即提交并设置延迟跳转，
+   * 与点提交按钮的效果一致。保留 Enter 提交错误答案的能力，确保答错
+   * 也能被记录并显示正确答案。
+   * 约束：仅在未答题状态下检测，已答题后输入框禁用、键盘输入被忽略。
+   * 物理键盘 onChange 与移动端内置数字键盘共用此入口。
    */
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value
+  const applyValue = (val: string) => {
     setInputValue(val)
     if (answerStatus === 'idle') {
       const userAns = parseInt(val, 10)
       if (!Number.isNaN(userAns) && questions[currentIndex]?.answer === userAns) {
-        const currentQ = questions[currentIndex]
         setCorrectCount((c) => c + 1)
         correctCountRef.current += 1
         setAnswerStatus('correct')
@@ -215,6 +217,28 @@ export function GaozhaoPanel({ onBack }: GaozhaoPanelProps) {
         }, FEEDBACK_DELAY)
       }
     }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    applyValue(e.target.value)
+  }
+
+  // ===== 移动端内置数字键盘 =====
+  const handleDigit = (digit: string) => {
+    if (answerStatus !== 'idle') return
+    const next = inputValue + digit
+    if (next.length > 6) return
+    applyValue(next)
+  }
+
+  const handleBackspace = () => {
+    if (answerStatus !== 'idle') return
+    applyValue(inputValue.slice(0, -1))
+  }
+
+  const handleClear = () => {
+    if (answerStatus !== 'idle') return
+    applyValue('')
   }
 
   /** 退出练习，返回列表 */
@@ -393,11 +417,24 @@ export function GaozhaoPanel({ onBack }: GaozhaoPanelProps) {
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="输入答案"
+            placeholder={isTouch ? '点下方键盘输入' : '输入答案'}
             autoComplete="off"
             disabled={isAnswered}
+            inputMode={isTouch ? 'none' : undefined}
+            readOnly={isTouch}
           />
         </div>
+
+        {/* 触屏设备：内置数字键盘代替系统键盘，
+            避免键盘反复弹出/收起后无法唤起，且不遮挡题目 */}
+        {isTouch && (
+          <Keypad
+            onDigit={handleDigit}
+            onBackspace={handleBackspace}
+            onClear={handleClear}
+            onConfirm={handleSubmit}
+          />
+        )}
 
         {/* 反馈 */}
         <div className={feedbackClass}>{feedbackText}</div>

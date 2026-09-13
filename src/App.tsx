@@ -26,6 +26,7 @@ const DEFAULT_CONFIG: PracticeConfig = {
   mode: 'fixed',
   operations: ['add', 'sub', 'mul', 'div'],
   difficulty: 'easy',
+  direction: 'forward',
   totalCount: 20,
   endless: {
     initialTime: 60,

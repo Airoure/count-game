@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Card } from '@/components/shared/Card'
+import { Keypad } from '@/components/shared/Keypad'
 import { useSound } from '@/hooks/useSound'
 import { formatTime, formatQuestionNumber } from '@/utils/format'
+import { isTouchDevice } from '@/utils/touch'
 import type { Question, AnswerStatus, GameMode } from '@/types'
 import styles from './PracticePanel.module.css'
 import correctSound from '../../../sound/right.wav'
@@ -56,6 +58,7 @@ export function PracticePanel({
   onQuit,
 }: PracticePanelProps) {
   const [inputValue, setInputValue] = useState('')
+  const [isTouch] = useState(isTouchDevice)
   const inputRef = useRef<HTMLInputElement>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const playCorrect = useSound(correctSound)
@@ -126,17 +129,17 @@ export function PracticePanel({
   }
 
   /**
-   * 输入变化处理：更新值，并实时检测是否输入了正确答案
+   * 应用输入值：更新状态，并实时检测是否输入了正确答案
    *
    * 背景：去掉提交按钮后，用户输入正确答案时需要自动触发提交和跳转，
    * 避免用户每次答完还要手动点提交。
-   * 设计意图：在 onChange 中实时比对输入值与正确答案，匹配时立即提交
-   * 并设置延迟跳转，与原来点提交按钮的效果一致。保留 Enter 提交错误答案
-   * 的能力，确保答错也能被记录并显示反馈。
-   * 约束：仅在未答题状态下检测，已答题后输入框 disabled 防止重复触发。
+   * 设计意图：实时比对输入值与正确答案，匹配时立即提交并设置延迟跳转，
+   * 与点提交按钮的效果一致。保留 Enter 提交错误答案的能力，确保答错
+   * 也能被记录并显示反馈。
+   * 约束：仅在未答题状态下检测，已答题后输入框禁用、键盘输入被忽略。
+   * 物理键盘 onChange 与移动端内置数字键盘共用此入口。
    */
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value
+  const applyValue = (val: string) => {
     setInputValue(val)
     if (!isAnswered) {
       const userAns = parseInt(val, 10)
@@ -148,6 +151,28 @@ export function PracticePanel({
         }, feedbackDelay)
       }
     }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    applyValue(e.target.value)
+  }
+
+  // ===== 移动端内置数字键盘 =====
+  const handleDigit = (digit: string) => {
+    if (isAnswered) return
+    const next = inputValue + digit
+    if (next.length > 6) return
+    applyValue(next)
+  }
+
+  const handleBackspace = () => {
+    if (isAnswered) return
+    applyValue(inputValue.slice(0, -1))
+  }
+
+  const handleClear = () => {
+    if (isAnswered) return
+    applyValue('')
   }
 
   // 进度条：固定模式按题目进度，无尽模式按剩余时间占比
@@ -181,6 +206,45 @@ export function PracticePanel({
   const inputClass = `${styles.answerInput} ${
     answerStatus === 'correct' ? styles.inputCorrect : ''
   } ${answerStatus === 'wrong' ? styles.inputWrong : ''}`
+
+  // 题目表达式与结果：正向给数求结果（12² = ?），逆向给结果求数（?² = 144）
+  const reversed = currentQuestion.reversed === true
+  const questionExpr =
+    currentQuestion.op === 'square' ? (
+      <span className={styles.num} key={`sq-${questionKey}`}>
+        {reversed ? '?' : currentQuestion.a}
+        <sup className={styles.squareExp}>2</sup>
+      </span>
+    ) : reversed ? (
+      <>
+        <span className={styles.num} key={`q-${questionKey}`}>
+          ?
+        </span>
+        <span className={styles.op}>{currentQuestion.symbol}</span>
+        <span className={styles.num} key={`b-${questionKey}`}>
+          {currentQuestion.b}
+        </span>
+      </>
+    ) : (
+      <>
+        <span className={styles.num} key={`a-${questionKey}`}>
+          {currentQuestion.a}
+        </span>
+        <span className={styles.op}>{currentQuestion.symbol}</span>
+        <span className={styles.num} key={`b-${questionKey}`}>
+          {currentQuestion.b}
+        </span>
+      </>
+    )
+  const questionResult = reversed ? (
+    <span className={styles.num} key={`res-${questionKey}`}>
+      {currentQuestion.op === 'square'
+        ? currentQuestion.b
+        : currentQuestion.a * currentQuestion.b}
+    </span>
+  ) : (
+    <span className={styles.num}>?</span>
+  )
 
   return (
     <Card className={styles.practicePanel}>
@@ -245,15 +309,9 @@ export function PracticePanel({
             : formatQuestionNumber(currentIndex)}
         </div>
         <div className={styles.questionDisplay}>
-          <span className={styles.num} key={`a-${questionKey}`}>
-            {currentQuestion.a}
-          </span>
-          <span className={styles.op}>{currentQuestion.symbol}</span>
-          <span className={styles.num} key={`b-${questionKey}`}>
-            {currentQuestion.b}
-          </span>
+          {questionExpr}
           <span className={styles.equals}>=</span>
-          <span className={styles.num}>?</span>
+          {questionResult}
         </div>
       </div>
 
@@ -266,11 +324,24 @@ export function PracticePanel({
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder="输入答案"
+          placeholder={isTouch ? '点下方键盘输入' : '输入答案'}
           autoComplete="off"
           disabled={isAnswered}
+          inputMode={isTouch ? 'none' : undefined}
+          readOnly={isTouch}
         />
       </div>
+
+      {/* 触屏设备：内置数字键盘代替系统键盘，
+          避免键盘反复弹出/收起后无法唤起，且不遮挡题目 */}
+      {isTouch && (
+        <Keypad
+          onDigit={handleDigit}
+          onBackspace={handleBackspace}
+          onClear={handleClear}
+          onConfirm={handleSubmit}
+        />
+      )}
 
       {/* 反馈 */}
       <div className={feedbackClass}>{feedbackText}</div>

@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Card } from '@/components/shared/Card'
 import {
   OPERATION_LIST,
-  DIFFICULTY_LIST,
+  getDifficultyOptions,
+  DIRECTION_OPTIONS,
   COUNT_OPTIONS,
 } from '@/utils/questionGenerator'
-import type { BattleConfig, Operation, Difficulty } from '@/types'
+import type { BattleConfig, Operation, Difficulty, QuestionDirection } from '@/types'
 import styles from './BattleLobby.module.css'
 
 interface BattleLobbyProps {
@@ -31,6 +32,7 @@ export function BattleLobby({ onCreateRoom, onJoinRoom, onBack, error, onClearEr
   const [name, setName] = useState(defaultName ?? '')
   const [operations, setOperations] = useState<Operation[]>(['add', 'sub', 'mul', 'div'])
   const [difficulty, setDifficulty] = useState<Difficulty>('easy')
+  const [direction, setDirection] = useState<QuestionDirection>('forward')
   const [totalCount, setTotalCount] = useState(20)
 
   // 加入房间的表单状态
@@ -45,7 +47,7 @@ export function BattleLobby({ onCreateRoom, onJoinRoom, onBack, error, onClearEr
 
   const handleCreate = () => {
     if (!name.trim()) return
-    onCreateRoom(name.trim(), { operations, difficulty, totalCount })
+    onCreateRoom(name.trim(), { operations, difficulty, direction, totalCount })
   }
 
   const handleJoin = () => {
@@ -117,10 +119,10 @@ export function BattleLobby({ onCreateRoom, onJoinRoom, onBack, error, onClearEr
             ))}
           </div>
 
-          {/* 难度 */}
+          {/* 难度（文案随所选运算变化，平方数/大九九按基数范围描述） */}
           <div className={styles.sectionLabel}>难度等级</div>
           <div className={styles.diffGrid}>
-            {DIFFICULTY_LIST.map(({ diff, title, desc }) => (
+            {getDifficultyOptions(operations).map(({ diff, title, desc }) => (
               <button
                 key={diff}
                 className={`${styles.diffBtn} ${difficulty === diff ? styles.diffActive : ''}`}
@@ -132,6 +134,26 @@ export function BattleLobby({ onCreateRoom, onJoinRoom, onBack, error, onClearEr
               </button>
             ))}
           </div>
+
+          {/* 出题方向（仅平方数 / 大九九模块生效） */}
+          {(operations.includes('square') || operations.includes('mul19')) && (
+            <>
+              <div className={styles.sectionLabel}>出题方向</div>
+              <div className={styles.diffGrid}>
+                {DIRECTION_OPTIONS.map(({ value, label, desc }) => (
+                  <button
+                    key={value}
+                    className={`${styles.diffBtn} ${direction === value ? styles.diffActive : ''}`}
+                    onClick={() => setDirection(value)}
+                    type="button"
+                  >
+                    <div className={styles.diffTitle}>{label}</div>
+                    <div className={styles.diffDesc}>{desc}</div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* 题量 */}
           <div className={styles.sectionLabel}>题目数量</div>

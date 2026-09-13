@@ -294,3 +294,11 @@
     font-size: 0.9rem;
   }
 }
+
+/* 平方数指数上标 */
+.squareExp {
+  font-size: 0.45em;
+  vertical-align: super;
+  margin-left: 0.05em;
+  color: var(--vermilion);
+}

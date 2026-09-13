@@ -1,13 +1,14 @@
 import { Card } from '@/components/shared/Card'
 import {
   OPERATION_LIST,
-  DIFFICULTY_LIST,
+  getDifficultyOptions,
+  DIRECTION_OPTIONS,
   COUNT_OPTIONS,
   TIME_OPTIONS,
   BONUS_OPTIONS,
   PENALTY_OPTIONS,
 } from '@/utils/questionGenerator'
-import type { PracticeConfig, Operation, Difficulty, GameMode } from '@/types'
+import type { PracticeConfig, Operation, Difficulty, GameMode, QuestionDirection } from '@/types'
 import styles from './SetupPanel.module.css'
 
 interface SetupPanelProps {
@@ -40,6 +41,10 @@ export function SetupPanel({ config, onConfigChange, onStart, onShowHistory, onS
 
   const setDifficulty = (difficulty: Difficulty) => {
     onConfigChange({ ...config, difficulty })
+  }
+
+  const setDirection = (direction: QuestionDirection) => {
+    onConfigChange({ ...config, direction })
   }
 
   const setTotalCount = (totalCount: number) => {
@@ -114,13 +119,13 @@ export function SetupPanel({ config, onConfigChange, onStart, onShowHistory, onS
         ))}
       </div>
 
-      {/* 难度选择 */}
+      {/* 难度选择（文案随所选运算变化，平方数/大九九按基数范围描述） */}
       <div className={styles.sectionLabel}>
         难度等级
         <span className={styles.sectionNumber}>03 / DIFFICULTY</span>
       </div>
       <div className={styles.diffGrid}>
-        {DIFFICULTY_LIST.map(({ diff, title, desc, example }) => (
+        {getDifficultyOptions(config.operations).map(({ diff, title, desc, example }) => (
           <button
             key={diff}
             className={`${styles.diffBtn} ${config.difficulty === diff ? styles.active : ''}`}
@@ -134,12 +139,35 @@ export function SetupPanel({ config, onConfigChange, onStart, onShowHistory, onS
         ))}
       </div>
 
+      {/* 出题方向（仅平方数 / 大九九模块生效） */}
+      {(config.operations.includes('square') || config.operations.includes('mul19')) && (
+        <>
+          <div className={styles.sectionLabel}>
+            出题方向
+            <span className={styles.sectionNumber}>04 / DIRECTION</span>
+          </div>
+          <div className={styles.diffGrid}>
+            {DIRECTION_OPTIONS.map(({ value, label, desc }) => (
+              <button
+                key={value}
+                className={`${styles.diffBtn} ${config.direction === value ? styles.active : ''}`}
+                onClick={() => setDirection(value)}
+                type="button"
+              >
+                <div className={styles.diffTitle}>{label}</div>
+                <div className={styles.diffDesc}>{desc}</div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       {/* 题目数量 / 无尽设置 */}
       {config.mode === 'fixed' ? (
         <>
           <div className={styles.sectionLabel}>
             题目数量
-            <span className={styles.sectionNumber}>04 / COUNT</span>
+            <span className={styles.sectionNumber}>05 / COUNT</span>
           </div>
           <div className={styles.countOptions}>
             {COUNT_OPTIONS.map((count) => (
@@ -158,7 +186,7 @@ export function SetupPanel({ config, onConfigChange, onStart, onShowHistory, onS
         <>
           <div className={styles.sectionLabel}>
             时间设置
-            <span className={styles.sectionNumber}>04 / ENDLESS</span>
+            <span className={styles.sectionNumber}>05 / ENDLESS</span>
           </div>
           <div className={styles.endlessSection}>
             <div className={styles.endlessRow}>

@@ -4,6 +4,7 @@ import type {
   Difficulty,
   DifficultyMeta,
   Question,
+  QuestionDirection,
   PracticeConfig,
   GameMode,
   GradeInfo,
@@ -16,6 +17,8 @@ export const OPERATION_META: Record<Operation, OperationMeta> = {
   sub: { op: 'sub', symbol: '−', label: '减法' },
   mul: { op: 'mul', symbol: '×', label: '乘法' },
   div: { op: 'div', symbol: '÷', label: '除法' },
+  square: { op: 'square', symbol: 'n²', label: '平方数' },
+  mul19: { op: 'mul19', symbol: '九九', label: '大九九' },
 }
 
 /** 运算选项（按固定顺序） */
@@ -24,6 +27,8 @@ export const OPERATION_LIST: OperationMeta[] = [
   OPERATION_META.sub,
   OPERATION_META.mul,
   OPERATION_META.div,
+  OPERATION_META.square,
+  OPERATION_META.mul19,
 ]
 
 /** 难度元数据 */
@@ -48,8 +53,58 @@ export const DIFFICULTY_LIST: DifficultyMeta[] = [
   DIFFICULTY_META.hard,
 ]
 
+/** 各运算组的难度文案：四则合并为一组，平方数 / 大九九按基数范围表述 */
+const DIFFICULTY_GROUP_META = {
+  basic: {
+    easy: { desc: '四则 · 一位数与一位数', example: '7 + 8 = ?' },
+    hard: { desc: '四则 · 两位数与两位数', example: '36 + 47 = ?' },
+  },
+  square: {
+    easy: { desc: '平方数 · 2 ~ 15', example: '12² = ?' },
+    hard: { desc: '平方数 · 16 ~ 25', example: '23² = ?' },
+  },
+  mul19: {
+    easy: { desc: '大九九 · 11 ~ 15 互乘', example: '13 × 14 = ?' },
+    hard: { desc: '大九九 · 11 ~ 19 互乘', example: '17 × 18 = ?' },
+  },
+} as const
+
+/**
+ * 根据所选运算生成难度选项文案
+ *
+ * 平方数 / 大九九的难度含义是基数范围而非位数，
+ * 文案按所选运算动态生成，避免"一位数 / 两位数"的描述张冠李戴。
+ * 纯四则时维持原有文案不变；混合选择时逐组列出说明。
+ */
+export function getDifficultyOptions(operations: Operation[]): DifficultyMeta[] {
+  const groups: Array<keyof typeof DIFFICULTY_GROUP_META> = []
+  if (operations.some((op) => op === 'add' || op === 'sub' || op === 'mul' || op === 'div')) {
+    groups.push('basic')
+  }
+  if (operations.includes('square')) groups.push('square')
+  if (operations.includes('mul19')) groups.push('mul19')
+
+  if (groups.length === 0 || (groups.length === 1 && groups[0] === 'basic')) {
+    return DIFFICULTY_LIST
+  }
+
+  return DIFFICULTY_LIST.map(({ diff }) => ({
+    diff,
+    title: diff === 'easy' ? '入门' : '进阶',
+    desc: groups.map((g) => DIFFICULTY_GROUP_META[g][diff].desc).join('；'),
+    example: DIFFICULTY_GROUP_META[groups[0]][diff].example,
+  }))
+}
+
 /** 固定模式题量选项 */
 export const COUNT_OPTIONS = [10, 20, 30, 50] as const
+
+/** 出题方向选项（仅平方数 / 大九九生效） */
+export const DIRECTION_OPTIONS: Array<{ value: QuestionDirection; label: string; desc: string }> = [
+  { value: 'forward', label: '正向', desc: '12² = ?' },
+  { value: 'reverse', label: '逆向', desc: '?² = 144' },
+  { value: 'mixed', label: '混合', desc: '两种混出' },
+]
 
 /** 无尽模式初始时间选项（秒） */
 export const TIME_OPTIONS = [60, 120, 180, 300] as const
@@ -73,6 +128,17 @@ const GRADE_THRESHOLDS = [
  */
 function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
+/**
+ * 判断单道题是否应出逆向
+ *
+ * mixed 时每题独立随机，让正向 / 逆向交错出现
+ */
+function isReverseQuestion(direction: QuestionDirection | undefined): boolean {
+  if (direction === 'reverse') return true
+  if (direction === 'mixed') return Math.random() < 0.5
+  return false
 }
 
 /**
@@ -112,9 +178,39 @@ function generateOne(config: PracticeConfig): Question {
       answer = isEasy ? randInt(1, 9) : randInt(2, 15)
       a = b * answer
       break
+    case 'square': {
+      // 平方数：入门练 2~15，进阶练 16~25，覆盖考公必背的 1~25 平方数
+      const n = isEasy ? randInt(2, 15) : randInt(16, 25)
+      if (isReverseQuestion(config.direction)) {
+        // 逆向：?² = n²，求 n。a 为答案（根），b 为展示的平方值
+        return { a: n, b: n * n, op, symbol: '²', answer: n, reversed: true }
+      }
+      a = n
+      b = n
+      answer = n * n
+      break
+    }
+    case 'mul19': {
+      // 大九九：入门 11~15 互乘，进阶完整 11~19 互乘
+      const max = isEasy ? 15 : 19
+      const x = randInt(11, max)
+      const y = randInt(11, max)
+      if (isReverseQuestion(config.direction)) {
+        // 逆向：? × y = x·y，求 x。a 为答案（因子），b 为展示的已知因子
+        return { a: x, b: y, op, symbol: '×', answer: x, reversed: true }
+      }
+      a = x
+      b = y
+      answer = x * y
+      break
+    }
   }
 
-  return { a, b, op, symbol: meta.symbol, answer }
+  // 平方数题目符号为 ²，大九九用普通乘号；
+  // meta.symbol 里的 n² / 九九 仅用于设置页按钮与履历标签
+  const symbol = op === 'square' ? '²' : op === 'mul19' ? '×' : meta.symbol
+
+  return { a, b, op, symbol, answer }
 }
 
 /**

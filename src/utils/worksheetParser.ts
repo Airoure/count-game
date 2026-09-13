@@ -1,7 +1,10 @@
 import type { Question, Operation } from '@/types'
 
+/** 高照题库仅支持四则运算文本；square / mul19 是设置页专属模块，不出现在题库 */
+type WorksheetOperation = Extract<Operation, 'add' | 'sub' | 'mul' | 'div'>
+
 /** 运算符字符 → Operation 类型映射 */
-const OP_MAP: Record<string, Operation> = {
+const OP_MAP: Record<string, WorksheetOperation> = {
   '+': 'add',
   '-': 'sub',
   '\u2212': 'sub', // − U+2212 MINUS SIGN
@@ -14,7 +17,7 @@ const OP_MAP: Record<string, Operation> = {
 }
 
 /** Operation → 显示符号映射（与 OPERATION_META 保持一致） */
-const SYMBOL_MAP: Record<Operation, string> = {
+const SYMBOL_MAP: Record<WorksheetOperation, string> = {
   add: '+',
   sub: '\u2212', // −
   mul: '\u00d7', // ×
@@ -29,7 +32,7 @@ const QUESTION_RE = /^(\d+)\s*([+\-\u2212\u00d7xX*\u00f7/])\s*(\d+)$/
  *
  * 除法使用向下取整（与高照数算练习场景一致）
  */
-function computeAnswer(a: number, b: number, op: Operation): number {
+function computeAnswer(a: number, b: number, op: WorksheetOperation): number {
   switch (op) {
     case 'add':
       return a + b

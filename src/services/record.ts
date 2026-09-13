@@ -1,10 +1,8 @@
 import { getToken } from './auth'
+import type { Operation } from '@/types'
 
 /** 服务器地址（与 auth.ts 一致） */
 const SERVER_URL = import.meta.env.DEV ? 'http://localhost:3001' : ''
-
-/** 运算类型 */
-export type Operation = 'add' | 'sub' | 'mul' | 'div'
 
 /** 难度等级 */
 export type Difficulty = 'easy' | 'hard'
