@@ -2,6 +2,7 @@ import { Card } from '@/components/shared/Card'
 import {
   OPERATION_LIST,
   getDifficultyOptions,
+  shouldShowDifficulty,
   DIRECTION_OPTIONS,
   COUNT_OPTIONS,
   TIME_OPTIONS,
@@ -119,25 +120,30 @@ export function SetupPanel({ config, onConfigChange, onStart, onShowHistory, onS
         ))}
       </div>
 
-      {/* 难度选择（文案随所选运算变化，平方数/大九九按基数范围描述） */}
-      <div className={styles.sectionLabel}>
-        难度等级
-        <span className={styles.sectionNumber}>03 / DIFFICULTY</span>
-      </div>
-      <div className={styles.diffGrid}>
-        {getDifficultyOptions(config.operations).map(({ diff, title, desc, example }) => (
-          <button
-            key={diff}
-            className={`${styles.diffBtn} ${config.difficulty === diff ? styles.active : ''}`}
-            onClick={() => setDifficulty(diff)}
-            type="button"
-          >
-            <div className={styles.diffTitle}>{title}</div>
-            <div className={styles.diffDesc}>{desc}</div>
-            <div className={styles.diffExample}>{example}</div>
-          </button>
-        ))}
-      </div>
+      {/* 难度选择（文案随所选运算变化，平方数/大九九按基数范围描述；
+          只选平方数时难度不起作用 → 整块隐藏） */}
+      {shouldShowDifficulty(config.operations) && (
+        <>
+          <div className={styles.sectionLabel}>
+            难度等级
+            <span className={styles.sectionNumber}>03 / DIFFICULTY</span>
+          </div>
+          <div className={styles.diffGrid}>
+            {getDifficultyOptions(config.operations).map(({ diff, title, desc, example }) => (
+              <button
+                key={diff}
+                className={`${styles.diffBtn} ${config.difficulty === diff ? styles.active : ''}`}
+                onClick={() => setDifficulty(diff)}
+                type="button"
+              >
+                <div className={styles.diffTitle}>{title}</div>
+                <div className={styles.diffDesc}>{desc}</div>
+                <div className={styles.diffExample}>{example}</div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* 出题方向（仅平方数 / 大九九模块生效） */}
       {(config.operations.includes('square') || config.operations.includes('mul19')) && (

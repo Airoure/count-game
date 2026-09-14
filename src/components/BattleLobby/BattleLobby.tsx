@@ -3,6 +3,7 @@ import { Card } from '@/components/shared/Card'
 import {
   OPERATION_LIST,
   getDifficultyOptions,
+  shouldShowDifficulty,
   DIRECTION_OPTIONS,
   COUNT_OPTIONS,
 } from '@/utils/questionGenerator'
@@ -119,21 +120,26 @@ export function BattleLobby({ onCreateRoom, onJoinRoom, onBack, error, onClearEr
             ))}
           </div>
 
-          {/* 难度（文案随所选运算变化，平方数/大九九按基数范围描述） */}
-          <div className={styles.sectionLabel}>难度等级</div>
-          <div className={styles.diffGrid}>
-            {getDifficultyOptions(operations).map(({ diff, title, desc }) => (
-              <button
-                key={diff}
-                className={`${styles.diffBtn} ${difficulty === diff ? styles.diffActive : ''}`}
-                onClick={() => setDifficulty(diff)}
-                type="button"
-              >
-                <div className={styles.diffTitle}>{title}</div>
-                <div className={styles.diffDesc}>{desc}</div>
-              </button>
-            ))}
-          </div>
+          {/* 难度（文案随所选运算变化，平方数/大九九按基数范围描述；
+              只选平方数时难度不起作用 → 整块隐藏） */}
+          {shouldShowDifficulty(operations) && (
+            <>
+              <div className={styles.sectionLabel}>难度等级</div>
+              <div className={styles.diffGrid}>
+                {getDifficultyOptions(operations).map(({ diff, title, desc }) => (
+                  <button
+                    key={diff}
+                    className={`${styles.diffBtn} ${difficulty === diff ? styles.diffActive : ''}`}
+                    onClick={() => setDifficulty(diff)}
+                    type="button"
+                  >
+                    <div className={styles.diffTitle}>{title}</div>
+                    <div className={styles.diffDesc}>{desc}</div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* 出题方向（仅平方数 / 大九九模块生效） */}
           {(operations.includes('square') || operations.includes('mul19')) && (
