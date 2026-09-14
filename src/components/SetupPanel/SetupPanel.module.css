@@ -346,3 +346,13 @@
     min-width: 0;
   }
 }
+
+/* ===== 运算附加说明（平方数固定范围提示）===== */
+.opNote {
+  margin: -1.1rem 0 1.6rem;
+  font-family: var(--font-serif);
+  font-size: 0.82rem;
+  letter-spacing: 0.05em;
+  color: var(--vermilion);
+  opacity: 0.85;
+}

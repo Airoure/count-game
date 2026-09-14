@@ -119,9 +119,12 @@ export function SetupPanel({ config, onConfigChange, onStart, onShowHistory, onS
           </button>
         ))}
       </div>
+      {config.operations.includes('square') && (
+        <p className={styles.opNote}>平方数固定练 11 ~ 30（20 个底数，一组练习内不重复）</p>
+      )}
 
-      {/* 难度选择（文案随所选运算变化，平方数/大九九按基数范围描述；
-          只选平方数时难度不起作用 → 整块隐藏） */}
+      {/* 难度选择（文案随所选运算变化，大九九按基数范围描述；
+          平方数固定 11~30 与难度无关，只选平方数时整块隐藏） */}
       {shouldShowDifficulty(config.operations) && (
         <>
           <div className={styles.sectionLabel}>

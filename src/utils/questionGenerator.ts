@@ -53,15 +53,11 @@ export const DIFFICULTY_LIST: DifficultyMeta[] = [
   DIFFICULTY_META.hard,
 ]
 
-/** 各运算组的难度文案：四则合并为一组，平方数 / 大九九按基数范围表述 */
+/** 各运算组的难度文案：四则合并为一组，大九九按基数范围表述（平方数固定 11~30，不参与难度分档） */
 const DIFFICULTY_GROUP_META = {
   basic: {
     easy: { desc: '四则 · 一位数与一位数', example: '7 + 8 = ?' },
     hard: { desc: '四则 · 两位数与两位数', example: '36 + 47 = ?' },
-  },
-  square: {
-    easy: { desc: '平方数 · 11 ~ 30', example: '12² = ?' },
-    hard: { desc: '平方数 · 11 ~ 30', example: '23² = ?' },
   },
   mul19: {
     easy: { desc: '大九九 · 11 ~ 15 互乘', example: '13 × 14 = ?' },
@@ -72,16 +68,18 @@ const DIFFICULTY_GROUP_META = {
 /**
  * 根据所选运算生成难度选项文案
  *
- * 平方数 / 大九九的难度含义是基数范围而非位数，
- * 文案按所选运算动态生成，避免"一位数 / 两位数"的描述张冠李戴。
+ * 大九九的难度含义是基数范围而非位数，文案按所选运算动态生成，
+ * 避免"一位数 / 两位数"的描述张冠李戴。
  * 纯四则时维持原有文案不变；混合选择时逐组列出说明。
+ *
+ * 平方数已固定考 11~30，与难度无关，因此不出现在难度文案里；
+ * 若只选了平方数，难度区整体不展示（见 shouldShowDifficulty）。
  */
 export function getDifficultyOptions(operations: Operation[]): DifficultyMeta[] {
   const groups: Array<keyof typeof DIFFICULTY_GROUP_META> = []
   if (operations.some((op) => op === 'add' || op === 'sub' || op === 'mul' || op === 'div')) {
     groups.push('basic')
   }
-  if (operations.includes('square')) groups.push('square')
   if (operations.includes('mul19')) groups.push('mul19')
 
   if (groups.length === 0 || (groups.length === 1 && groups[0] === 'basic')) {
